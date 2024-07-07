@@ -21,7 +21,7 @@ Favbook is a simple Command-Line Interface (CLI) application for managing a coll
 3. Run the application using the following command:
 
    ```sh
-   deno run --allow-read --allow-write --allow-net main.ts
+   deno run --allow-read --allow-write main.ts
 
 
 ## Usage
