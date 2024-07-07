@@ -1,32 +1,20 @@
-// main.ts
-import { Book } from "./book.ts";
+import { DB } from "https://deno.land/x/sqlite/mod.ts";
 
-let books: Book[] = [];
-let currentId = 1;
-const dataFile = "./books.json";
+let db: DB;
 
-async function loadBooks() {
-    try {
-        const data = await Deno.readTextFile(dataFile);
-        books = JSON.parse(data);
-        if (books.length > 0) {
-            currentId = books[books.length - 1].id + 1;
-        }
-    } catch (error) {
-        if (error instanceof Deno.errors.NotFound) {
-            await Deno.writeTextFile(dataFile, JSON.stringify([]));
-        } else {
-            throw error;
-        }
-    }
-}
-
-async function saveBooks() {
-    await Deno.writeTextFile(dataFile, JSON.stringify(books, null, 2));
+async function initializeDatabase() {
+    db = new DB("books.db");
+    await db.query(`
+        CREATE TABLE IF NOT EXISTS books (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            author TEXT
+        )
+    `);
 }
 
 async function mainMenu() {
-    console.log("\nBook Manager");
+    console.log("\nFavbook");
     console.log("1. List Books");
     console.log("2. Add Book");
     console.log("3. Edit Book");
@@ -45,7 +33,7 @@ async function mainMenu() {
             await editBook();
             break;
         case "4":
-            deleteBook();
+            await deleteBook();
             break;
         case "5":
             console.log("Goodbye!");
@@ -55,27 +43,36 @@ async function mainMenu() {
     }
 }
 
+async function listBooks() {
+    const books = await db.query("SELECT * FROM books");
+    
+    if (books.length === 0) {
+        console.log("No books found.");
+    } else {
+        console.log("\nList of Books: ");
+        books.forEach((book) => {
+            console.log(`ID: ${book[0]}, Title: ${book[1]}, Author: ${book[2]}`);
+        });
+    }
+}
+
 async function addBook() {
     const title = await prompt("Enter book title: ");
     const author = await prompt("Enter book author: ");
 
-    const newBook: Book = { id: currentId++, title, author };
-    books.push(newBook);
-    await saveBooks();
+    await db.query("INSERT INTO books (title, author) VALUES (?, ?)", [title, author]);
     console.log("Book added successfully.");
 }
 
 async function editBook() {
     const id = parseInt(await prompt("Enter book ID to edit: "));
-    const book = books.find((b) => b.id === id);
+    const book = await db.query("SELECT * FROM books WHERE id = ?", [id]);
 
-    if (book) {
-        const title = await prompt(`Enter new title (current: ${book.title}): `);
-        const author = await prompt(`Enter new author (current: ${book.author}): `);
+    if (book.length > 0) {
+        const newTitle = await prompt(`Enter new title (current: ${book[0][1]}): `) || book[0][1];
+        const newAuthor = await prompt(`Enter new author (current: ${book[0][2]}): `) || book[0][2];
 
-        book.title = title || book.title;
-        book.author = author || book.author;
-        await saveBooks();
+        await db.query("UPDATE books SET title = ?, author = ? WHERE id = ?", [newTitle, newAuthor, id]);
         console.log("Book updated successfully.");
     } else {
         console.log("Book not found.");
@@ -84,25 +81,12 @@ async function editBook() {
 
 async function deleteBook() {
     const id = parseInt(await prompt("Enter book ID to delete: "));
-    const index = books.findIndex((b) => b.id === id);
+    const result = await db.query("DELETE FROM books WHERE id = ?", [id]);
 
-    if (index !== -1) {
-        books.splice(index, 1);
-        await saveBooks();
+    if (result) {
         console.log("Book deleted successfully.");
     } else {
         console.log("Book not found.");
-    }
-}
-
-function listBooks() {
-    if (books.length === 0) {
-        console.log("No books found.");
-    } else {
-        console.log("\nList of Books:");
-        books.forEach((book) => {
-            console.log(`ID: ${book.id}, Title: ${book.title}, Author: ${book.author}`);
-        });
     }
 }
 
@@ -113,10 +97,7 @@ async function prompt(question: string): Promise<string> {
     return new TextDecoder().decode(buf.subarray(0, n)).trim();
 }
 
-// アプリケーションの開始時にデータをロード
-await loadBooks();
-
-// メインメニューをループして表示
+await initializeDatabase();
 while (true) {
     await mainMenu();
 }
