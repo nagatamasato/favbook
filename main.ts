@@ -1,20 +1,42 @@
+// main.ts
 import { Book } from "./book.ts";
 
 let books: Book[] = [];
 let currentId = 1;
+const dataFile = "./books.json";
+
+async function loadBooks() {
+    try {
+        const data = await Deno.readTextFile(dataFile);
+        books = JSON.parse(data);
+        if (books.length > 0) {
+            currentId = books[books.length - 1].id + 1;
+        }
+    } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+            await Deno.writeTextFile(dataFile, JSON.stringify([]));
+        } else {
+            throw error;
+        }
+    }
+}
+
+async function saveBooks() {
+    await Deno.writeTextFile(dataFile, JSON.stringify(books, null, 2));
+}
 
 async function mainMenu() {
-    console.log("\nFavbook");
+    console.log("\nBook Manager");
     console.log("1. List Books");
     console.log("2. Add Book");
     console.log("3. Edit Book");
-    console.log("4. Delete Book")
+    console.log("4. Delete Book");
     console.log("5. Exit");
 
     const choice = await prompt("Choose an option: ");
     switch (choice) {
         case "1":
-            listBooks();
+            await listBooks();
             break;
         case "2":
             await addBook();
@@ -23,7 +45,7 @@ async function mainMenu() {
             await editBook();
             break;
         case "4":
-            await deleteBook();
+            deleteBook();
             break;
         case "5":
             console.log("Goodbye!");
@@ -33,23 +55,13 @@ async function mainMenu() {
     }
 }
 
-function listBooks() {
-    if (books.length === 0) {
-        console.log("No books found.");
-    } else {
-        console.log("\nList of Books: ");
-        books.forEach((book) => {
-            console.log(`ID: ${book.id}, Title: ${book.title}, Author: ${book.author}`);
-        });
-    }
-}
-
 async function addBook() {
     const title = await prompt("Enter book title: ");
     const author = await prompt("Enter book author: ");
 
     const newBook: Book = { id: currentId++, title, author };
     books.push(newBook);
+    await saveBooks();
     console.log("Book added successfully.");
 }
 
@@ -63,6 +75,7 @@ async function editBook() {
 
         book.title = title || book.title;
         book.author = author || book.author;
+        await saveBooks();
         console.log("Book updated successfully.");
     } else {
         console.log("Book not found.");
@@ -75,9 +88,21 @@ async function deleteBook() {
 
     if (index !== -1) {
         books.splice(index, 1);
+        await saveBooks();
         console.log("Book deleted successfully.");
     } else {
         console.log("Book not found.");
+    }
+}
+
+function listBooks() {
+    if (books.length === 0) {
+        console.log("No books found.");
+    } else {
+        console.log("\nList of Books:");
+        books.forEach((book) => {
+            console.log(`ID: ${book.id}, Title: ${book.title}, Author: ${book.author}`);
+        });
     }
 }
 
@@ -88,6 +113,10 @@ async function prompt(question: string): Promise<string> {
     return new TextDecoder().decode(buf.subarray(0, n)).trim();
 }
 
+// アプリケーションの開始時にデータをロード
+await loadBooks();
+
+// メインメニューをループして表示
 while (true) {
     await mainMenu();
 }
