@@ -91,6 +91,10 @@ This README provides a comprehensive overview of the Favbook CLI application, in
 
 # Changelog
 
+## v1.2
+
+- Switch data persistence to SQLite from JSON
+
 ## v1.1
 
 - Implemented data persistence using JSON files
